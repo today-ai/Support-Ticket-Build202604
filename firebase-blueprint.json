@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role management",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "User avatar URL" },
+        "role": { "enum": ["user", "admin"], "type": "string", "description": "Application role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Profile creation timestamp" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Support ticket information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Ticket ID" },
+        "title": { "type": "string", "description": "Ticket subject" },
+        "description": { "type": "string", "description": "Detailed problem description" },
+        "status": { "enum": ["open", "in-process", "closed"], "type": "string", "description": "Current resolution status" },
+        "priority": { "enum": ["low", "medium", "high", "urgent"], "type": "string", "description": "Ticket severity" },
+        "creatorId": { "type": "string", "description": "UID of the user who created the ticket" },
+        "creatorName": { "type": "string", "description": "Name of the ticket creator" },
+        "assigneeId": { "type": "string", "description": "UID of the admin assigned to the ticket" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when ticket was opened" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of last internal update" }
+      },
+      "required": ["title", "description", "status", "priority", "creatorId"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Messages added to a ticket",
+      "type": "object",
+      "properties": {
+        "ticketId": { "type": "string", "description": "Reference ticket ID" },
+        "authorId": { "type": "string", "description": "UID of the commenter" },
+        "authorName": { "type": "string", "description": "Display name of the commenter" },
+        "text": { "type": "string", "description": "Comment content" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Comment timestamp" }
+      },
+      "required": ["ticketId", "authorId", "text"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System alerts for users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Recipient UID" },
+        "message": { "type": "string", "description": "Alert text" },
+        "link": { "type": "string", "description": "Internal link to the ticket" },
+        "read": { "type": "boolean", "description": "Read status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Notification time" }
+      },
+      "required": ["userId", "message", "read"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profile documents" },
+    "/tickets/{ticketId}": { "schema": "Ticket", "description": "Support tickets" },
+    "/tickets/{ticketId}/comments/{commentId}": { "schema": "Comment", "description": "Threaded comments for tickets" },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "User notifications" }
+  }
+}

@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields: uid, email, displayName, photoURL, role (user|admin), createdAt
+    //
+    // Collection: tickets
+    // Document ID: {ticketId}
+    // Fields: title, description, status (open|in-process|closed), priority, creatorId, creatorName, assigneeId, createdAt, updatedAt
+    //
+    // Collection: tickets/{ticketId}/comments
+    // Document ID: {commentId}
+    // Fields: ticketId, authorId, authorName, text, createdAt
+    //
+    // Collection: notifications
+    // Document ID: {notificationId}
+    // Fields: userId, message, link, read, createdAt
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "shakeelsaeedofficial@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isTicketOwner(ticketData) {
+      return isAuthenticated() && request.auth.uid == ticketData.creatorId;
+    }
+
+    // Validation Helpers
+    function isValidTicket(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 5000 &&
+             data.status in ['open', 'in-process', 'closed'] &&
+             data.priority in ['low', 'medium', 'high', 'urgent'] &&
+             data.creatorId is string &&
+             data.creatorId == request.auth.uid;
+    }
+
+    function isValidComment(data) {
+      return data.ticketId is string &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 2000 &&
+             data.authorId == request.auth.uid;
+    }
+
+    function isValidUser(data) {
+      return data.email is string && data.email.size() > 0 &&
+             data.role in ['user', 'admin'] &&
+             data.uid == request.auth.uid;
+    }
+
+    // ===============================================================
+    // match rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /tickets/{ticketId} {
+      allow read: if isAuthenticated() && (isTicketOwner(resource.data) || isAdmin());
+      allow create: if isAuthenticated() && isValidTicket(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (isTicketOwner(resource.data) && isValidTicket(request.resource.data) && request.resource.data.status == resource.data.status) || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if isAuthenticated() && (isTicketOwner(get(/databases/$(database)/documents/tickets/$(ticketId)).data) || isAdmin());
+        allow create: if isAuthenticated() && isValidComment(request.resource.data);
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAdmin(); // Only admins/system can create notifications (unless triggers used)
+      allow update: if isOwner(resource.data.userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+    }
+  }
+}
