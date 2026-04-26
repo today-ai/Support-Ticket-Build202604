@@ -51,13 +51,15 @@ service cloud.firestore {
              data.status in ['open', 'in-process', 'closed'] &&
              data.priority in ['low', 'medium', 'high', 'urgent'] &&
              data.creatorId is string &&
-             data.creatorId == request.auth.uid;
+             data.creatorId == request.auth.uid &&
+             (!('assigneeEmail' in data) || data.assigneeEmail == null || (data.assigneeEmail is string && data.assigneeEmail.size() < 200));
     }
 
     function isValidComment(data) {
       return data.ticketId is string &&
              data.text is string && data.text.size() > 0 && data.text.size() < 2000 &&
-             data.authorId == request.auth.uid;
+             data.authorId == request.auth.uid &&
+             (!('assigneeEmail' in data) || data.assigneeEmail == null || (data.assigneeEmail is string && data.assigneeEmail.size() < 200));
     }
 
     function isValidUser(data) {
@@ -73,20 +75,22 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin())) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /tickets/{ticketId} {
-      allow read: if isAuthenticated() && (isTicketOwner(resource.data) || isAdmin());
+      allow read: if isAuthenticated() && (isTicketOwner(resource.data) || isAdmin() || resource.data.assigneeEmail == request.auth.token.email || resource.data.assigneeId == request.auth.uid);
       allow create: if isAuthenticated() && isValidTicket(request.resource.data);
       allow update: if isAuthenticated() && (
         (isTicketOwner(resource.data) && isValidTicket(request.resource.data) && request.resource.data.status == resource.data.status) || 
+        (resource.data.assigneeEmail == request.auth.token.email && isValidTicket(request.resource.data)) ||
         isAdmin()
       );
       allow delete: if isAdmin();
 
       match /comments/{commentId} {
-        allow read: if isAuthenticated() && (isTicketOwner(get(/databases/$(database)/documents/tickets/$(ticketId)).data) || isAdmin());
+        allow read: if isAuthenticated() && (isTicketOwner(get(/databases/$(database)/documents/tickets/$(ticketId)).data) || get(/databases/$(database)/documents/tickets/$(ticketId)).data.assigneeEmail == request.auth.token.email || get(/databases/$(database)/documents/tickets/$(ticketId)).data.assigneeId == request.auth.uid || isAdmin());
         allow create: if isAuthenticated() && isValidComment(request.resource.data);
       }
     }

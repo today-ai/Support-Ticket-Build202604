@@ -27,6 +27,7 @@
         "creatorId": { "type": "string", "description": "UID of the user who created the ticket" },
         "creatorName": { "type": "string", "description": "Name of the ticket creator" },
         "assigneeId": { "type": "string", "description": "UID of the admin assigned to the ticket" },
+        "assigneeEmail": { "type": "string", "description": "Email address assigned to the ticket" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when ticket was opened" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of last internal update" }
       },
@@ -41,6 +42,7 @@
         "authorId": { "type": "string", "description": "UID of the commenter" },
         "authorName": { "type": "string", "description": "Display name of the commenter" },
         "text": { "type": "string", "description": "Comment content" },
+        "assigneeEmail": { "type": "string", "description": "Email assigned via this comment" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Comment timestamp" }
       },
       "required": ["ticketId", "authorId", "text"]

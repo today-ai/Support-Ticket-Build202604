@@ -127,9 +127,9 @@ export default function TicketList({ onSelectTicket, isAdmin, userId }: TicketLi
                   </div>
                   <h4 className="truncate font-semibold text-text-main group-hover:text-primary transition-colors">{ticket.title}</h4>
                   <p className="truncate text-xs text-text-muted truncate">
-                    {ticket.assigneeId ? (
+                    {ticket.assigneeId || ticket.assigneeEmail ? (
                        <span className="inline-flex items-center gap-1 text-primary-dark font-medium mr-2">
-                         Assigned: {ticket.assigneeName}
+                         Assigned: {ticket.assigneeEmail || ticket.assigneeName}
                        </span>
                     ) : (
                        <span className="text-text-muted italic mr-2">Unassigned</span>

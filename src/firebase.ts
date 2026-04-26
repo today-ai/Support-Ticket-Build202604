@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, getDoc, query, where, onSnapshot, orderBy, addDoc, updateDoc, serverTimestamp, Timestamp, getDocFromServer, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, getDoc, query, where, onSnapshot, orderBy, addDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDocFromServer, getDocs } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -19,6 +19,7 @@ export {
   orderBy, 
   addDoc, 
   updateDoc, 
+  deleteDoc,
   serverTimestamp,
   Timestamp,
   getDocFromServer,

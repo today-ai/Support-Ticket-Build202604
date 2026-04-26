@@ -11,6 +11,8 @@
   --color-status-open: #f59e0b;
   --color-status-progress: #3b82f6;
   --color-status-closed: #10b981;
+
+  --animate-spin-slow: spin 3s linear infinite;
 }
 
 @layer base {

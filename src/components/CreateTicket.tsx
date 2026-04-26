@@ -14,6 +14,7 @@ export default function CreateTicket({ onClose, user }: CreateTicketProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TicketPriority>('medium');
+  const [assigneeEmail, setAssigneeEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +33,7 @@ export default function CreateTicket({ onClose, user }: CreateTicketProps) {
         status: 'open',
         creatorId: user.uid,
         creatorName: user.displayName || 'Anonymous',
+        assigneeEmail: assigneeEmail.trim() || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -106,6 +108,17 @@ export default function CreateTicket({ onClose, user }: CreateTicketProps) {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-text-muted">Assign To (Email) <span className="lowercase font-normal tracking-normal">- Optional</span></label>
+              <input 
+                type="email" 
+                value={assigneeEmail}
+                onChange={(e) => setAssigneeEmail(e.target.value)}
+                placeholder="agent@example.com"
+                className="w-full rounded-lg border border-border bg-app-bg px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary transition-all font-medium placeholder:text-text-muted/30"
+              />
             </div>
 
             <div>

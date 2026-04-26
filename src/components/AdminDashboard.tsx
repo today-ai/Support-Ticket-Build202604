@@ -2,8 +2,9 @@ import { useState, useEffect, ReactNode } from 'react';
 import { db, collection, query, onSnapshot, orderBy } from '../firebase';
 import { Ticket } from '../types';
 import TicketList from './TicketList';
+import UserManagement from './UserManagement';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
-import { Users, CheckCircle2, Clock, ListFilter, TrendingUp, Activity, UserPlus, ShieldAlert, Award } from 'lucide-react';
+import { Users, CheckCircle2, Clock, ListFilter, TrendingUp, Activity, UserPlus, ShieldAlert, Award, Grid, ShieldCheck, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
 import { formatDistance } from 'date-fns';
 
@@ -14,24 +15,41 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ onSelectTicket }: AdminDashboardProps) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'users'>('overview');
+  const [crmStatus, setCrmStatus] = useState({
+    status: 'success' as 'success' | 'error',
+    lastSync: new Date(Date.now() - 5000),
+    latency: 124
+  });
 
   useEffect(() => {
+    // Pulse effect simulation for CRM
+    const interval = setInterval(() => {
+      setCrmStatus(prev => ({
+        ...prev,
+        lastSync: new Date(),
+        status: Math.random() > 0.05 ? 'success' : 'error'
+      }));
+    }, 15000);
+
     const q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Ticket[]);
       setLoading(false);
     });
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, []); // Simulated sync doesn't strictly depend on user for this heartbeat
 
   if (loading) return <div className="text-center py-20 text-gray-400">Loading metrics...</div>;
-
   // Stats calculation
   const totalTickets = tickets.length;
   const openTickets = tickets.filter(t => t.status === 'open').length;
   const inProcessTickets = tickets.filter(t => t.status === 'in-process').length;
   const closedTickets = tickets.filter(t => t.status === 'closed').length;
-  const unassignedTickets = tickets.filter(t => !t.assigneeId).length;
+  const unassignedTickets = tickets.filter(t => !t.assigneeId && !t.assigneeEmail).length;
 
   // Resolution Time Calculation
   const closedWithTiming = tickets.filter(t => t.status === 'closed' && t.closedAt && t.createdAt);
@@ -57,135 +75,178 @@ export default function AdminDashboard({ onSelectTicket }: AdminDashboardProps) 
   ];
 
   // Agent Performance (Actual assigned agents)
-  const agents = Array.from(new Set(tickets.map(t => t.assigneeName).filter(Boolean)));
-  const agentPerformance = agents.map(name => ({
-    name: name!,
-    resolved: tickets.filter(t => t.assigneeName === name && t.status === 'closed').length,
-    active: tickets.filter(t => t.assigneeName === name && t.status !== 'closed').length,
+  const agents = Array.from(new Set(tickets.map(t => t.assigneeEmail || t.assigneeName).filter(Boolean)));
+  const agentPerformance = agents.map(agentIdentifier => ({
+    name: agentIdentifier!,
+    resolved: tickets.filter(t => (t.assigneeEmail === agentIdentifier || t.assigneeName === agentIdentifier) && t.status === 'closed').length,
+    active: tickets.filter(t => (t.assigneeEmail === agentIdentifier || t.assigneeName === agentIdentifier) && t.status !== 'closed').length,
   })).sort((a,b) => b.resolved - a.resolved);
 
   const assignmentData = [
     { name: 'Assigned', value: totalTickets - unassignedTickets, color: '#4f46e5' },
     { name: 'Unassigned', value: unassignedTickets, color: '#e2e8f0' },
-  ];
-
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 h-full overflow-y-auto pr-2 custom-scrollbar">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Open Tickets" value={openTickets} icon={<Activity size={20} />} color="amber" secondary={`${Math.round((openTickets/totalTickets)*100)}% of queue`} />
-        <StatCard title="Avg. Response" value={formatTime(avgResolutionTimeMs)} icon={<Clock size={20} />} color="blue" isSmall />
-        <StatCard title="Agent Happiness" value="98%" icon={<Award size={20} />} color="emerald" secondary="Stable" />
-        <StatCard title="CRM Health" value="Syncing" icon={<Activity size={20} />} color="indigo" secondary="Sync: 2m ago" />
+  ];  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
+      {/* Sub-navigation Tabs */}
+      <div className="flex items-center gap-1 border-b border-border mb-6">
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-2 px-6 py-3 text-[11px] font-black uppercase tracking-widest transition-all relative ${
+            activeTab === 'overview' ? 'text-primary' : 'text-text-muted hover:text-text-main'
+          }`}
+        >
+          <Grid size={14} />
+          Operational Metrics
+          {activeTab === 'overview' && <motion.div layoutId="admintab" className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />}
+        </button>
+        <button 
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-2 px-6 py-3 text-[11px] font-black uppercase tracking-widest transition-all relative ${
+            activeTab === 'users' ? 'text-primary' : 'text-text-muted hover:text-text-main'
+          }`}
+        >
+          <ShieldCheck size={14} />
+          User Governance
+          {activeTab === 'users' && <motion.div layoutId="admintab" className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />}
+        </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Priority Volume Chart */}
-        <section className="lg:col-span-2 rounded-xl border border-border bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted">Tickets by Priority</h3>
-            <div className="flex gap-4 text-[10px] font-bold uppercase">
-               <span className="flex items-center gap-1 text-red-500"><ShieldAlert size={12}/> {tickets.filter(t => t.priority === 'urgent').length} Urgent</span>
-            </div>
+      {activeTab === 'overview' ? (
+        <div className="space-y-8">
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard title="Open Tickets" value={openTickets} icon={<Activity size={20} />} color="amber" secondary={`${Math.round((openTickets/totalTickets)*100)}% of queue`} />
+            <StatCard title="Avg. Response" value={formatTime(avgResolutionTimeMs)} icon={<Clock size={20} />} color="blue" isSmall />
+            <StatCard title="Agent Happiness" value="98%" icon={<Award size={20} />} color="emerald" secondary="Stable" />
+            <StatCard 
+              title="CRM Health" 
+              value={crmStatus.status === 'success' ? 'Operational' : 'Degraded'} 
+              icon={crmStatus.status === 'success' ? <RefreshCw size={20} className="animate-spin-slow" /> : <AlertCircle size={20} />} 
+              color={crmStatus.status === 'success' ? 'indigo' : 'amber'} 
+              secondary={
+                <div className="flex items-center gap-1.5 capitalize">
+                  {crmStatus.status === 'success' ? (
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  ) : (
+                    <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  )}
+                  {formatDistance(crmStatus.lastSync, new Date(), { addSuffix: true })}
+                </div>
+              } 
+            />
           </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={priorityData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32}>
-                  {priorityData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Priority Volume Chart */}
+            <section className="lg:col-span-2 rounded-xl border border-border bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted">Tickets by Priority</h3>
+                <div className="flex gap-4 text-[10px] font-bold uppercase">
+                  <span className="flex items-center gap-1 text-red-500"><ShieldAlert size={12}/> {tickets.filter(t => t.priority === 'urgent').length} Urgent</span>
+                </div>
+              </div>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={priorityData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                    <Tooltip 
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32}>
+                      {priorityData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+
+            {/* Resource Allocation */}
+            <section className="rounded-xl border border-border bg-white p-6 shadow-sm">
+              <h3 className="mb-8 text-xs font-bold uppercase tracking-widest text-text-muted">Resource Allocation</h3>
+              <div className="h-64 w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={assignmentData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {assignmentData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-3xl font-black text-text-main tabular-nums">
+                    {Math.round(((totalTickets - unassignedTickets) / (totalTickets || 1)) * 100)}%
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-text-muted">Assigned</span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Ticket List Panel */}
+            <section className="lg:col-span-2 rounded-xl border border-border bg-white shadow-sm flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between border-b border-border bg-white p-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-main">Recent Active Tickets</h3>
+              </div>
+              <div className="flex-1 overflow-y-auto max-h-[500px] p-4 bg-app-bg custom-scrollbar relative">
+                <TicketList onSelectTicket={onSelectTicket} isAdmin={true} userId="admin" />
+              </div>
+            </section>
+
+            {/* Agent Performance Panel */}
+            <section className="rounded-xl border border-border bg-white shadow-sm flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between border-b border-border bg-white p-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-main">Agent Performance</h3>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="h-32 w-full flex items-end gap-2 pb-2 border-b border-border">
+                  {priorityData.map((p, i) => (
+                    <motion.div 
+                      key={i}
+                      initial={{ height: 0 }}
+                      animate={{ height: `${(p.value / totalTickets) * 100}%` }}
+                      className="flex-1 bg-primary rounded-t-sm min-h-[4px]"
+                    />
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                </div>
+                
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted">Top Agents</h4>
+                  {agentPerformance.length === 0 ? (
+                    <p className="text-xs text-text-muted italic">No data</p>
+                  ) : (
+                    agentPerformance.map((agent) => (
+                      <div key={agent.name} className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-text-main">{agent.name}</span>
+                        <span className="text-sm font-bold text-emerald-600">
+                          {Math.round((agent.resolved / (agent.resolved + agent.active || 1)) * 100)}%
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
-
-        {/* Resource Allocation */}
-        <section className="rounded-xl border border-border bg-white p-6 shadow-sm">
-          <h3 className="mb-8 text-xs font-bold uppercase tracking-widest text-text-muted">Resource Allocation</h3>
-          <div className="h-64 w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={assignmentData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {assignmentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-               <span className="text-3xl font-black text-text-main tabular-nums">
-                 {Math.round(((totalTickets - unassignedTickets) / (totalTickets || 1)) * 100)}%
-               </span>
-               <span className="text-[10px] uppercase font-bold text-text-muted">Assigned</span>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Ticket List Panel */}
-        <section className="lg:col-span-2 rounded-xl border border-border bg-white shadow-sm flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border bg-white p-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-main">Recent Active Tickets</h3>
-          </div>
-          <div className="flex-1 overflow-y-auto max-h-[500px] p-4">
-            <TicketList onSelectTicket={onSelectTicket} isAdmin={true} userId="admin" />
-          </div>
-        </section>
-
-        {/* Agent Performance Panel */}
-        <section className="rounded-xl border border-border bg-white shadow-sm flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border bg-white p-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-main">Agent Performance</h3>
-          </div>
-          <div className="p-6 space-y-6">
-            <div className="h-32 w-full flex items-end gap-2 pb-2 border-b border-border">
-              {priorityData.map((p, i) => (
-                <motion.div 
-                  key={i}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${(p.value / totalTickets) * 100}%` }}
-                  className="flex-1 bg-primary rounded-t-sm min-h-[4px]"
-                />
-              ))}
-            </div>
-            
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted">Top Agents</h4>
-              {agentPerformance.length === 0 ? (
-                <p className="text-xs text-text-muted italic">No data</p>
-              ) : (
-                agentPerformance.map((agent) => (
-                  <div key={agent.name} className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-text-main">{agent.name}</span>
-                    <span className="text-sm font-bold text-emerald-600">
-                      {Math.round((agent.resolved / (agent.resolved + agent.active || 1)) * 100)}%
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
+        </div>
+      ) : (
+        <UserManagement />
+      )}
     </div>
   );
 }

@@ -17,6 +17,7 @@ export default function TicketDetail({ ticketId, onBack, isAdmin }: TicketDetail
   const [comments, setComments] = useState<Comment[]>([]);
   const [admins, setAdmins] = useState<UserProfile[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [commentAssigneeEmail, setCommentAssigneeEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
 
@@ -111,9 +112,18 @@ export default function TicketDetail({ ticketId, onBack, isAdmin }: TicketDetail
         authorId: user.uid,
         authorName: user.displayName || 'Anonymous',
         text: newComment,
+        assigneeEmail: commentAssigneeEmail.trim() || null,
         createdAt: serverTimestamp()
       });
       
+      // Update the ticket's assigneeEmail if it was provided
+      if (commentAssigneeEmail.trim()) {
+        await updateDoc(doc(db, 'tickets', ticketId), {
+          assigneeEmail: commentAssigneeEmail.trim(),
+          updatedAt: serverTimestamp()
+        });
+      }
+
       // Notify the other party
       const recipientId = isAdmin ? ticket.creatorId : ticket.assigneeId;
       if (recipientId) {
@@ -186,35 +196,53 @@ export default function TicketDetail({ ticketId, onBack, isAdmin }: TicketDetail
                       ? 'bg-primary text-white shadow-sm' 
                       : 'bg-white border border-border shadow-sm text-text-main'
                   }`}>
-                    <div className="mb-2 flex items-center justify-between gap-4">
-                      <span className={`text-[10px] font-bold uppercase tracking-widest ${comment.authorId === auth.currentUser?.uid ? 'text-white/70' : 'text-text-muted'}`}>
-                        {comment.authorName}
-                      </span>
-                      <span className={`text-[9px] font-medium ${comment.authorId === auth.currentUser?.uid ? 'text-white/50' : 'text-text-muted/50'}`}>
-                        {comment.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-snug">{comment.text}</p>
-                  </div>
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${comment.authorId === auth.currentUser?.uid ? 'text-white/70' : 'text-text-muted'}`}>
+                    {comment.authorName}
+                  </span>
+                  <span className={`text-[9px] font-medium ${comment.authorId === auth.currentUser?.uid ? 'text-white/50' : 'text-text-muted/50'}`}>
+                    {comment.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <p className="text-sm leading-snug">{comment.text}</p>
+                {comment.assigneeEmail && (
+                  <p className={`mt-3 border-t pt-2 text-[10px] font-bold text-opacity-80 uppercase tracking-widest ${comment.authorId === auth.currentUser?.uid ? 'border-white/20 text-white' : 'border-border text-primary'}`}>
+                    Assigned to: {comment.assigneeEmail}
+                  </p>
+                )}
+              </div>
                 </div>
               ))}
             </div>
 
-            <form onSubmit={handleAddComment} className="relative mt-6">
+            <form onSubmit={handleAddComment} className="relative mt-6 space-y-3">
               <textarea 
                 rows={3}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Reply with sync to CRM..."
-                className="w-full rounded-xl border border-border bg-white p-4 pr-16 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none placeholder:text-text-muted/40"
+                className="w-full rounded-xl border border-border bg-white p-4 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none placeholder:text-text-muted/40"
               />
-              <button 
-                disabled={submittingComment || !newComment.trim()}
-                type="submit"
-                className="absolute bottom-4 right-4 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white transition-all hover:bg-primary-dark active:scale-95 disabled:opacity-50"
-              >
-                {submittingComment ? <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Send size={16} />}
-              </button>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="email" 
+                  value={commentAssigneeEmail}
+                  onChange={(e) => setCommentAssigneeEmail(e.target.value)}
+                  placeholder="Assign to (email) - Optional"
+                  className="flex-1 rounded-lg border border-border bg-white px-4 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all placeholder:text-text-muted/40"
+                />
+                <button 
+                  disabled={submittingComment || !newComment.trim()}
+                  type="submit"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-primary-dark active:scale-95 disabled:opacity-50"
+                >
+                  {submittingComment ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : (
+                    <>
+                      <Send size={16} /> Send
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           </section>
         </div>
@@ -224,13 +252,13 @@ export default function TicketDetail({ ticketId, onBack, isAdmin }: TicketDetail
           <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
             <h4 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-text-muted">Agent Assignment</h4>
             <div className="mb-6 flex items-center gap-3 rounded-lg border border-border bg-app-bg p-3">
-               {ticket.assigneeId ? (
+               {ticket.assigneeId || ticket.assigneeEmail ? (
                  <>
                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
                      <UserCheck size={20} />
                    </div>
                    <div className="overflow-hidden">
-                     <p className="truncate text-sm font-bold text-text-main leading-tight">{ticket.assigneeName}</p>
+                     <p className="truncate text-sm font-bold text-text-main leading-tight" title={ticket.assigneeEmail || ticket.assigneeName}>{ticket.assigneeEmail || ticket.assigneeName}</p>
                      <p className="text-[10px] text-text-muted font-bold uppercase">Active Agent</p>
                    </div>
                  </>

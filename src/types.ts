@@ -13,6 +13,7 @@ export interface Ticket {
   creatorName: string;
   assigneeId?: string;
   assigneeName?: string;
+  assigneeEmail?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   closedAt?: Timestamp;
@@ -24,6 +25,7 @@ export interface Comment {
   authorId: string;
   authorName: string;
   text: string;
+  assigneeEmail?: string;
   createdAt: Timestamp;
 }
 

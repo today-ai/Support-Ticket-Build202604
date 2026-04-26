@@ -6,19 +6,20 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { loginWithGoogle, logout, db, collection, query, where, onSnapshot, orderBy, doc, getDoc, getDocFromServer } from './firebase';
-import { Layout, Ticket, Users, PieChart, LogOut, Bell, Plus, Search, Filter, CheckCircle2, Circle, Clock, ChevronRight, X, MessageSquare, ShieldCheck, Activity } from 'lucide-react';
+import { Layout, Ticket, Users, PieChart, LogOut, Bell, Plus, Search, Filter, CheckCircle2, Circle, Clock, ChevronRight, X, MessageSquare, ShieldCheck, Activity, LayoutDashboard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Notification } from './types';
 
 // Components
 import TicketList from './components/TicketList';
 import AdminDashboard from './components/AdminDashboard';
+import UserDashboard from './components/UserDashboard';
 import CreateTicket from './components/CreateTicket';
 import TicketDetail from './components/TicketDetail';
 
 export default function App() {
   const { user, profile, loading, isAdmin } = useAuth();
-  const [view, setView] = useState<'tickets' | 'admin'>('tickets');
+  const [view, setView] = useState<'tickets' | 'dashboard'>('dashboard');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [isShowingCreate, setIsShowingCreate] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -113,19 +114,17 @@ export default function App() {
         
         <div className="flex w-full flex-1 flex-col mt-4">
           <NavItem 
+            active={view === 'dashboard'} 
+            onClick={() => { setView('dashboard'); setSelectedTicketId(null); setShowMobileMenu(false); }}
+            icon={<LayoutDashboard size={18} />}
+            label="Dashboard"
+          />
+          <NavItem 
             active={view === 'tickets'} 
             onClick={() => { setView('tickets'); setSelectedTicketId(null); setShowMobileMenu(false); }}
             icon={<Ticket size={18} />}
-            label="All Tickets"
+            label={isAdmin ? "All Registry" : "My Tickets"}
           />
-          {isAdmin && (
-            <NavItem 
-              active={view === 'admin'} 
-              onClick={() => { setView('admin'); setSelectedTicketId(null); setShowMobileMenu(false); }}
-              icon={<Users size={18} />}
-              label="Dashboard"
-            />
-          )}
           <NavItem 
             active={false} 
             onClick={() => {}}
@@ -238,7 +237,7 @@ export default function App() {
         </header>
 
         {/* Dynamic View */}
-        <div className="p-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-app-bg relative">
           {selectedTicketId ? (
             <TicketDetail 
               ticketId={selectedTicketId} 
@@ -247,9 +246,13 @@ export default function App() {
             />
           ) : (
             view === 'tickets' ? (
-              <TicketList onSelectTicket={setSelectedTicketId} isAdmin={false} userId={user.uid} />
+              <TicketList onSelectTicket={setSelectedTicketId} isAdmin={isAdmin} userId={user.uid} />
             ) : (
-              <AdminDashboard onSelectTicket={setSelectedTicketId} />
+              isAdmin ? (
+                <AdminDashboard onSelectTicket={setSelectedTicketId} />
+              ) : (
+                <UserDashboard onSelectTicket={setSelectedTicketId} userId={user.uid} userEmail={user.email || undefined} />
+              )
             )
           )}
         </div>
